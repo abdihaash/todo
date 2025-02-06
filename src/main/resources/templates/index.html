@@ -149,6 +149,12 @@
          </li>
      </ul>
  </div>
+ <!-- ✅ Pagination Controls -->
+ <div class="pagination">
+     <a th:if="${currentPage > 0}" th:href="@{/todos(page=${currentPage - 1}, size=10)}">Previous</a>
+     <span th:text="${currentPage + 1} + ' / ' + ${totalPages}"></span>
+     <a th:if="${currentPage + 1 < totalPages}" th:href="@{/todos(page=${currentPage + 1}, size=10)}">Next</a>
+ </div>
 
  <!-- Update Modal -->
  <div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
@@ -312,6 +318,45 @@
         document.addEventListener("DOMContentLoaded", function () {
             restoreCheckboxState();
         });
+
+        function restoreCheckboxState() {
+            fetch(`/todos?page=${currentPage}&size=10`) // ✅ Fetch only 10 tasks
+                .then(response => response.json())
+                .then(todos => {
+                    document.querySelectorAll(".todo-checkbox").forEach(checkbox => {
+                        let id = checkbox.getAttribute("data-task-id");
+                        let todo = todos.find(t => t.id == id);
+
+                        if (todo && todo.completed) {
+                            checkbox.checked = true;
+                            let taskElement = checkbox.closest("li");
+                            taskElement.classList.add("completed");
+
+                            let editButton = taskElement.querySelector(".edit-btn");
+                            let deleteButton = taskElement.querySelector(".delete-btn");
+
+                            editButton.style.pointerEvents = "none";
+                            editButton.style.opacity = "0.5";
+                            deleteButton.style.pointerEvents = "none";
+                            deleteButton.style.opacity = "0.5";
+                        } else {
+                            checkbox.checked = false;
+                            let taskElement = checkbox.closest("li");
+                            taskElement.classList.remove("completed");
+
+                            let editButton = taskElement.querySelector(".edit-btn");
+                            let deleteButton = taskElement.querySelector(".delete-btn");
+
+                            editButton.style.pointerEvents = "auto";
+                            editButton.style.opacity = "1";
+                            deleteButton.style.pointerEvents = "auto";
+                            deleteButton.style.opacity = "1";
+                        }
+                    });
+                })
+                .catch(error => console.error("Error fetching todos:", error));
+        }
+
 
     </script>
 
