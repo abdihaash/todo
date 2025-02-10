@@ -107,10 +107,13 @@
  <body>
  <div class="container">
      <h1>TODOLIST</h1>
-     <form th:action="@{/todos/save}" method="post">
+     <form id="todoForm" th:action="@{/todos/save}" method="post" onsubmit="checkDuplicateTitle(event)">
          <input type="text" name="title" placeholder="What needs to be done?" required>
+         <div id="titleError" style="color: red; font-size: 14px; margin-top: 5px;"></div> <!-- ✅ Error message placeholder -->
          <button type="submit">+</button>
      </form>
+
+
 
      <ul class="todo-list">
          <li class="todo-item" th:each="todo : ${todos}">
@@ -151,9 +154,16 @@
  </div>
  <!-- ✅ Pagination Controls -->
  <div class="pagination">
-     <a th:if="${currentPage > 0}" th:href="@{/todos(page=${currentPage - 1}, size=10)}">Previous</a>
-     <span th:text="${currentPage + 1} + ' / ' + ${totalPages}"></span>
-     <a th:if="${currentPage + 1 < totalPages}" th:href="@{/todos(page=${currentPage + 1}, size=10)}">Next</a>
+     <div th:if="${totalPages > 0}" class="pagination">
+         <a th:if="${currentPage != null and currentPage > 0}"
+            th:href="@{/todos(page=${currentPage - 1}, size=10)}">Previous</a>
+
+         <span th:text="(${currentPage != null ? currentPage + 1 : 1}) + ' / ' + (${totalPages > 0 ? totalPages : 1})"></span>
+
+         <a th:if="${currentPage != null and currentPage + 1 < totalPages}"
+            th:href="@{/todos(page=${currentPage + 1}, size=10)}">Next</a>
+     </div>
+
  </div>
 
  <!-- Update Modal -->
@@ -196,169 +206,163 @@
      </div>
  </div>
 
-    <script>
-        // ✅ Declare deleteId globally
-        let deleteId = null;
+ <script>
+     // ✅ Declare deleteId globally
+     let deleteId = null;
 
-        // ✅ Set the ID of the task to be deleted
-        function setDeleteId(id) {
-            deleteId = id;
-            console.log("Delete Task ID Set: ", deleteId);
-        }
+     // ✅ Set the ID of the task to be deleted
+     function setDeleteId(id) {
+         deleteId = id;
+         console.log("Delete Task ID Set: ", deleteId);
+     }
 
-        // ✅ Handle deleting a task
-        document.addEventListener("DOMContentLoaded", function () {
-            document.getElementById("confirmDeleteButton").addEventListener("click", function () {
-                if (deleteId) {
-                    fetch(`/todos/delete/${deleteId}`, { method: "DELETE" })
-                        .then(response => {
-                            if (response.ok) {
-                                console.log("✅ Task deleted successfully!");
-                                window.location.reload();
-                            } else {
-                                alert("❌ Failed to delete the task.");
-                            }
-                        })
-                        .catch(error => console.error("Error:", error));
-                } else {
-                    alert("❌ No task ID selected!");
-                }
-            });
-        });
+     // ✅ Handle deleting a task
+     document.addEventListener("DOMContentLoaded", function () {
+         document.getElementById("confirmDeleteButton").addEventListener("click", function () {
+             if (deleteId) {
+                 fetch(`/todos/delete/${deleteId}`, { method: "DELETE" })
+                     .then(response => {
+                         if (response.ok) {
+                             console.log("✅ Task deleted successfully!");
+                             window.location.reload(); // ✅ Reload after deletion
+                         } else {
+                             alert("❌ Failed to delete the task.");
+                         }
+                     })
+                     .catch(error => console.error("Error:", error));
+             } else {
+                 alert("❌ No task ID selected!");
+             }
+         });
 
-        // ✅ Ensure update modal fields are set correctly when opening the edit modal
-        document.addEventListener("DOMContentLoaded", function () {
-            document.querySelectorAll(".edit-btn").forEach(button => {
-                button.addEventListener("click", function () {
-                    let taskId = this.getAttribute("data-task-id");
-                    let taskTitle = this.getAttribute("data-task-title");
+         // ✅ Ensure update modal fields are set correctly when opening the edit modal
+         document.querySelectorAll(".edit-btn").forEach(button => {
+             button.addEventListener("click", function () {
+                 let taskId = this.getAttribute("data-task-id");
+                 let taskTitle = this.getAttribute("data-task-title");
 
-                    document.getElementById("updateId").value = taskId;
-                    document.getElementById("updateTitle").value = taskTitle;
-                });
-            });
-        });
+                 document.getElementById("updateId").value = taskId;
+                 document.getElementById("updateTitle").value = taskTitle;
+             });
+         });
 
-        // ✅ Fetch all tasks from the backend and update checkbox states
-        function restoreCheckboxState() {
-            fetch("/todos/all") // ✅ Fetch latest task data from backend
-                .then(response => response.json())
-                .then(todos => {
-                    document.querySelectorAll(".todo-checkbox").forEach(checkbox => {
-                        let id = checkbox.getAttribute("data-task-id");
-                        let todo = todos.find(t => t.id == id); // ✅ Find matching task
+         // ✅ Restore checkbox states when page loads
+         restoreCheckboxState();
+     });
 
-                        if (todo && todo.completed) {
-                            checkbox.checked = true;
-                            let taskElement = checkbox.closest("li");
-                            taskElement.classList.add("completed");
+     // ✅ Prevent duplicate task titles before submitting
+     function checkDuplicateTitle(event) {
+         event.preventDefault(); // Stop form submission
 
-                            // ✅ Disable edit button
-                            let editButton = taskElement.querySelector(".edit-btn");
-                            editButton.style.pointerEvents = "none";
-                            editButton.style.opacity = "0.5";
-                        } else {
-                            checkbox.checked = false;
-                            let taskElement = checkbox.closest("li");
-                            taskElement.classList.remove("completed");
+         let titleInput = document.querySelector("input[name='title']");
+         let title = titleInput.value.trim();
+         let errorMessage = document.getElementById("titleError");
 
-                            // ✅ Enable edit button
-                            let editButton = taskElement.querySelector(".edit-btn");
-                            editButton.style.pointerEvents = "auto";
-                            editButton.style.opacity = "1";
-                        }
-                    });
-                })
-                .catch(error => console.error("Error fetching todos:", error));
-        }
+         // Clear previous error messages
+         errorMessage.textContent = "";
 
-        // ✅ Update task completion state when checkbox is clicked
-        function toggleComplete(checkbox, id) {
-            fetch(`/todos/update/${id}`, {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ completed: checkbox.checked })
-            })
-                .then(response => {
-                    if (!response.ok) {
-                        return response.text().then(text => { throw new Error(text); });
-                    }
-                    return response.json();
-                })
-                .then(data => {
-                    console.log("Update Success:", data);
-                    let taskElement = checkbox.closest("li");
-                    let editButton = taskElement.querySelector(".edit-btn");
-                    let deleteButton = taskElement.querySelector(".delete-btn");
+         if (!title) {
+             errorMessage.textContent = "❌ Task title cannot be empty!";
+             return;
+         }
 
-                    // ✅ Disable edit & delete buttons if task is completed
-                    if (checkbox.checked) {
-                        taskElement.classList.add("completed");
-                        editButton.style.pointerEvents = "none";
-                        editButton.style.opacity = "0.5";
-                        deleteButton.style.pointerEvents = "none";
-                        deleteButton.style.opacity = "0.5";
-                    } else {
-                        taskElement.classList.remove("completed");
-                        editButton.style.pointerEvents = "auto";
-                        editButton.style.opacity = "1";
-                        deleteButton.style.pointerEvents = "auto";
-                        deleteButton.style.opacity = "1";
-                    }
-                })
-                .catch(error => {
-                    console.error("Error updating task:", error);
-                });
-        }
+         fetch("/todos/all")
+             .then(response => response.json())
+             .then(todos => {
+                 // ✅ Check for duplicates (case-insensitive)
+                 let duplicate = todos.some(todo => todo.title.toLowerCase() === title.toLowerCase());
+
+                 if (duplicate) {
+                     errorMessage.textContent = "❌ A task with this title already exists!";
+                 } else {
+                     document.getElementById("todoForm").submit(); // ✅ Submit if no duplicate
+                 }
+             })
+             .catch(error => console.error("Error fetching todos:", error));
+     }
 
 
+     // ✅ Restore checkboxes and disable buttons for completed tasks
+     function restoreCheckboxState() {
+         fetch("/todos/all") // ✅ Fetch latest tasks
+             .then(response => response.json())
+             .then(todos => {
+                 document.querySelectorAll(".todo-checkbox").forEach(checkbox => {
+                     let id = checkbox.getAttribute("data-task-id");
+                     let todo = todos.find(t => t.id == id);
 
+                     if (todo && todo.completed) {
+                         checkbox.checked = true;
+                         let taskElement = checkbox.closest("li");
+                         taskElement.classList.add("completed");
 
-        // ✅ Ensure everything is initialized when page loads
-        document.addEventListener("DOMContentLoaded", function () {
-            restoreCheckboxState();
-        });
+                         // ✅ Disable edit & delete buttons
+                         let editButton = taskElement.querySelector(".edit-btn");
+                         let deleteButton = taskElement.querySelector(".delete-btn");
 
-        function restoreCheckboxState() {
-            fetch(`/todos?page=${currentPage}&size=10`) // ✅ Fetch only 10 tasks
-                .then(response => response.json())
-                .then(todos => {
-                    document.querySelectorAll(".todo-checkbox").forEach(checkbox => {
-                        let id = checkbox.getAttribute("data-task-id");
-                        let todo = todos.find(t => t.id == id);
+                         editButton.style.pointerEvents = "none";
+                         editButton.style.opacity = "0.5";
+                         deleteButton.style.pointerEvents = "none";
+                         deleteButton.style.opacity = "0.5";
+                     } else {
+                         checkbox.checked = false;
+                         let taskElement = checkbox.closest("li");
+                         taskElement.classList.remove("completed");
 
-                        if (todo && todo.completed) {
-                            checkbox.checked = true;
-                            let taskElement = checkbox.closest("li");
-                            taskElement.classList.add("completed");
+                         // ✅ Enable edit & delete buttons
+                         let editButton = taskElement.querySelector(".edit-btn");
+                         let deleteButton = taskElement.querySelector(".delete-btn");
 
-                            let editButton = taskElement.querySelector(".edit-btn");
-                            let deleteButton = taskElement.querySelector(".delete-btn");
+                         editButton.style.pointerEvents = "auto";
+                         editButton.style.opacity = "1";
+                         deleteButton.style.pointerEvents = "auto";
+                         deleteButton.style.opacity = "1";
+                     }
+                 });
+             })
+             .catch(error => console.error("Error fetching todos:", error));
+     }
 
-                            editButton.style.pointerEvents = "none";
-                            editButton.style.opacity = "0.5";
-                            deleteButton.style.pointerEvents = "none";
-                            deleteButton.style.opacity = "0.5";
-                        } else {
-                            checkbox.checked = false;
-                            let taskElement = checkbox.closest("li");
-                            taskElement.classList.remove("completed");
+     // ✅ Toggle task completion state
+     function toggleComplete(checkbox, id) {
+         fetch(`/todos/update/${id}`, {
+             method: "POST",
+             headers: { "Content-Type": "application/json" },
+             body: JSON.stringify({ completed: checkbox.checked })
+         })
+             .then(response => {
+                 if (!response.ok) {
+                     return response.text().then(text => { throw new Error(text); });
+                 }
+                 return response.json();
+             })
+             .then(data => {
+                 console.log("Update Success:", data);
+                 let taskElement = checkbox.closest("li");
+                 let editButton = taskElement.querySelector(".edit-btn");
+                 let deleteButton = taskElement.querySelector(".delete-btn");
 
-                            let editButton = taskElement.querySelector(".edit-btn");
-                            let deleteButton = taskElement.querySelector(".delete-btn");
+                 // ✅ Disable edit & delete buttons if task is completed
+                 if (checkbox.checked) {
+                     taskElement.classList.add("completed");
+                     editButton.style.pointerEvents = "none";
+                     editButton.style.opacity = "0.5";
+                     deleteButton.style.pointerEvents = "none";
+                     deleteButton.style.opacity = "0.5";
+                 } else {
+                     taskElement.classList.remove("completed");
+                     editButton.style.pointerEvents = "auto";
+                     editButton.style.opacity = "1";
+                     deleteButton.style.pointerEvents = "auto";
+                     deleteButton.style.opacity = "1";
+                 }
+             })
+             .catch(error => {
+                 console.error("Error updating task:", error);
+             });
+     }
+ </script>
 
-                            editButton.style.pointerEvents = "auto";
-                            editButton.style.opacity = "1";
-                            deleteButton.style.pointerEvents = "auto";
-                            deleteButton.style.opacity = "1";
-                        }
-                    });
-                })
-                .catch(error => console.error("Error fetching todos:", error));
-        }
-
-
-    </script>
 
  </body>
 </html>

@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.PageRequest;
-
+import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 
 
 import java.util.List;
@@ -47,24 +47,41 @@ public class TodoController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
 
-        Pageable pageable = PageRequest.of(page, size); // ✅ No casting needed
-        Page<Todo> todoPage = todoService.getAllTodos(pageable); // ✅ Pass directly
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Todo> todoPage = todoService.getAllTodos(pageable);
+
+        int totalPages = todoPage.getTotalPages();
+
+        // 🛠 Ensure totalPages is at least 1 to avoid Thymeleaf errors
+        totalPages = Math.max(1, totalPages);
+
+        // 🛠 Prevent user from requesting an invalid page number
+        if (page >= totalPages) {
+            return "redirect:/todos?page=0";
+        }
 
         model.addAttribute("todos", todoPage.getContent());
         model.addAttribute("currentPage", page);
-        model.addAttribute("totalPages", todoPage.getTotalPages());
+        model.addAttribute("totalPages", totalPages);
 
-        return "index"; // ✅ Loads paginated data into the frontend
+        return "index"; // ✅ Ensures the frontend doesn't crash
     }
+
 
 
 
 
     @PostMapping("/save")
-    public String saveTodo(@ModelAttribute("todo") Todo todo) {
-        todoService.saveOrUpdate(todo);
+    public String saveTodo(@ModelAttribute("todo") Todo todo, RedirectAttributes redirectAttributes) {
+        try {
+            todoService.saveOrUpdate(todo);
+        } catch (IllegalArgumentException e) {
+            redirectAttributes.addFlashAttribute("error", "Task with this title already exists!");
+            return "redirect:/todos";
+        }
         return "redirect:/todos";
     }
+
 
 
 

@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable; // ✅ Correct import
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Optional;
 
 @Service
 public class TodoService {
@@ -28,7 +29,13 @@ public class TodoService {
         return todoRepository.findById(id).orElse(null);
     }
 
+
+
     public void saveOrUpdate(Todo todo) {
+        Optional<Todo> existingTodo = todoRepository.findByTitle(todo.getTitle());
+        if (existingTodo.isPresent()) {
+            throw new IllegalArgumentException("Task with this title already exists!");
+        }
         todoRepository.save(todo);
     }
 
